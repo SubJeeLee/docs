@@ -1,7 +1,7 @@
 {
   "$schema": "https://mintlify.com/docs.json",
   "theme": "mint",
-  "name": "💻 섭지리의 개발 블로그",
+  "name": "섭지리의 개발 블로그",
   "colors": {
     "primary": "#16A34A",
     "light": "#07C983",
@@ -14,16 +14,11 @@
   "navigation": {
     "tabs": [
       {
-        "tab": "blog",
+        "tab": "Blog",
         "groups": [
           {
             "group": "Review",
-            "pages": [
-              {
-                "group": "week9",
-                "pages": ["week9"]
-              }
-            ]
+            "pages": ["Review/week9", "Review/test"]
           }
         ]
       }
@@ -34,11 +29,6 @@
       "type": "button",
       "label": "Dashboard",
       "href": "https://dashboard.mintlify.com"
-    }
-  },
-  "footer": {
-    "socials": {
-      "github": "https://github.com/SubJeeLee"
     }
   }
 }
