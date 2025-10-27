@@ -2,13 +2,12 @@
 
 ## ESLint 분리
 
-![스크린샷 2025-10-27 오후 4.28.57.png](attachment:4567b8cb-bf82-42f4-bab4-2124412db931:스크린샷_2025-10-27_오후_4.28.57.png)
+![Eslint Pn](/images/Review/week9/eslint.png)
 
 ### 의도 파악
 
 지금 프로젝트에는 **프론트엔드(frontend)** 와 **백엔드(backend)** 코드가 함께 들어 있는 모노레포를 의도했다
 
-> 그런데 ESLint 설정(`eslint.config.js`나 `.eslintrc.cjs`)을 하나로 통합해두면,
-> 프론트엔드와 백엔드가 **각자 필요한 규칙이 달라서 충돌 가능성 높다!**
+> 그런데 ESLint 설정(`eslint.config.js`나 `.eslintrc.cjs`)을 하나로 통합해두면, 프론트엔드와 백엔드가 **각자 필요한 규칙이 달라서 충돌 가능성 높다!**
 
 → “공통 설정은 따로 한 곳에 두고, 각 프로젝트(frontend, backend)는 그걸 ‘확장’해서 써라.”
