@@ -11,3 +11,191 @@
 > 그런데 ESLint 설정(`eslint.config.js`나 `.eslintrc.cjs`)을 하나로 통합해두면, 프론트엔드와 백엔드가 **각자 필요한 규칙이 달라서 충돌 가능성 높다!**
 
 → “공통 설정은 따로 한 곳에 두고, 각 프로젝트(frontend, backend)는 그걸 ‘확장’해서 써라.”
+
+```
+web-p4-bangbang/
+├─ packages/
+│  ├─ frontend/
+│  │  ├─ .eslintrc.cjs   ← @myrepo/eslint-config를 확장
+│  ├─ backend/
+│  │  ├─ .eslintrc.cjs   ← @myrepo/eslint-config를 확장
+│  └─ eslint-config/     ← 공통 규칙을 담은 패키지
+│     ├─ package.json
+│     └─ index.js        ← 공통 ESLint 규칙을 export
+└─ package.json
+```
+
+### 고민
+
+사실 **지금처럼 루트 하나에서 프론트(frontend)와 백엔드(backend)를 구분해서 ESLint 설정을 분리한 구조**도 충분히 실용적이고, 대부분의 소규모/단일 개발자 환경에서는 문제 없다고 생각하지만,\
+그런데 리뷰어님께서 제안한 “eslint-config 패키지로 분리”는 **규모가 커질 때 유지보수성과 일관성을 극대화하기 위한 설계 방식**이기에 수정해야겠다고 생각했습니다.
+
+### ESLint 구조 비교표
+
+| 구분                | 현재 구조 (루트 통합 설정)                              | 리뷰어 제안 구조 (공통 + 각 패키지 분리)                                             |
+| :---------------- | :-------------------------------------------- | :-------------------------------------------------------------------- |
+| **폴더 구조**         | `eslint.config.js` 하나로 FE/BE 설정 모두 포함         | `/packages/eslint-config/` 패키지 생성 후 FE/BE 각각 `.eslintrc.cjs` 에서 확장    |
+| **관리 위치**         | 루트 하나의 파일에서 모든 설정 관리                          | FE/BE별 설정 파일이 존재하고 공통 규칙만 별도 패키지로 관리                                  |
+| **설정 복잡도**        | 단일 파일로 간단함. 구조 파악이 쉬움                         | 구조가 세분화되어 초기 세팅 복잡함                                                   |
+| **유지보수성**         | FE/BE 구조나 TS 설정이 바뀌면 하나의 파일에서 수정해야 함 (충돌 가능)  | FE/BE가 완전히 독립적이라 변경이 서로 영향 주지 않음                                      |
+| **공통 규칙 관리**      | 한 파일에서 조건 분기로 FE/BE 구분                        | `@web-p4-bangbang/eslint-config` 패키지에서 공통 룰만 정의 → 확장(import) 방식으로 재사용 |
+| **확장성 (팀 프로젝트)**  | 소규모(개인/2~3명)엔 충분히 효율적                         | 대규모(여러 팀, 서브패키지 존재) 구조에서 유리함                                          |
+| **호환성 (IDE/CLI)** | 일부 IDE는 파일 기반 glob 감지 문제로 FE/BE 경계에서 경고 누락 가능 | 각 패키지 루트에 `.eslintrc.cjs` 존재 → IDE 자동 감지 잘 됨                          |
+| **초기 진입 장벽**      | 단순함, 바로 실행 가능                                 | 폴더 이동 + package.json 분리 필요 → 초기에 번거로움                                 |
+| **Git 변경 리스크**    | 한 파일이 크므로 merge conflict 위험 있음                | 파일 분리로 conflict 줄어듦                                                   |
+| **적합한 상황**        | 개인 프로젝트, 단일 레포 구조                             | 모노레포, FE/BE 팀 분리, 확장 가능성 큰 경우                                         |
+
+## 불필요한 코드 제거
+
+![Debugging Pn](/images/Review/week9/debugging.png)
+
+![Hard Pn](/images/Review/week9/hard.png)
+
+### **하드코딩(Hardcoding)의 문제점**
+
+**하드코딩**이란, 코드 내부에 직접 값을 고정해서 사용하는 방식을 의미합니다.\
+예를 들어, 아래와 같이 임시 데이터를 직접 넣는 경우가 이에 해당합니다.
+
+```
+<span>₩100,000 ~ ₩1,000,000</span>
+```
+
+이 방식은 빠른 퍼블리싱 확인이나 시각적 테스트에 유용하지만,\
+**실제 서비스 환경에서는 여러 문제를 야기하기 때문에 지양 필수!**
+
+#### ⚠️ 문제점
+
+- **유지보수성 저하:** 데이터가 변경될 때마다 코드를 직접 수정해야 함.
+- **재사용성 제한:** 다른 페이지나 API 연동 시 유연하게 대응할 수 없음.
+- **실제 데이터 불일치:** API로 받아온 값과 화면 표시가 다를 수 있음.
+- **협업 리스크:** 하드코딩된 임시 데이터가 그대로 배포될 가능성 존재.
+
+#### 개선 방향
+
+- **props나 context를 통해 데이터 주입**
+- **mock data는 별도 파일로 관리 (**`/mocks`**폴더)**
+- **API 연동 시 실제 응답 기반 렌더링으로 대체**
+
+### 고민 과정
+
+> 그럼 백엔드 연동 전에 하드코딩 대신 **퍼블리싱 테스트**를 할 수 있는 방법이 있을까? 아직 백엔드가 구현이 되지 않은 상태라서 고민이야
+
+#### 1. 더미 데이터로 테스트
+
+```tsx
+const dummyListings = [
+  {
+    id: 1,
+    title: "서울 강남 한옥 게스트하우스",
+    price: 150000,
+    image: "/images/hanok.jpg",
+    rating: 4.9,
+  },
+  {
+    id: 2,
+    title: "제주 감성 독채 숙소",
+    price: 200000,
+    image: "/images/jeju.jpg",
+    rating: 4.7,
+  },
+];
+
+export default function ListingSection() {
+  const listings = dummyListings;
+
+  return (
+    <section className="flex flex-col py-6">
+      <h2 className="text-2xl font-bold text-zinc-800">테스트용 숙소 리스트</h2>
+      <div className="mt-6 flex flex-wrap gap-4">
+        {listings.map((l) => (
+          <ListingCard key={l.id} {...l} />
+        ))}
+      </div>
+    </section>
+  );
+}
+```
+
+- 이건 실제로 Airbnb나 Coupang 팀에서도 “백엔드가 늦어질 때 임시 데이터로 퍼블리싱 진행”할 때 자주 사용
+- 나중에 dummyListings를 `fetch('/api/listings')`로만 바꾸면 그대로 실데이터로 전환 가능
+
+#### 2. **public/mock-data.json 파일로 분리하기**
+
+> 데이터를 코드 안에 넣지 않고 **JSON 파일**로 관리해서, **실제 API**처럼 불러오는 방식
+
+```json
+// public/mock-data.json
+
+[
+  { "id": 1, "title": "서울 강남 한옥 게스트하우스", "price": 150000 },
+  { "id": 2, "title": "제주 감성 독채 숙소", "price": 200000 }
+]
+```
+
+```tsx
+useEffect(() => {
+  fetch("/mock-data.json")
+    .then((res) => res.json())
+    .then(setListings);
+}, []);
+```
+
+- API 호출 흐름을 그대로 연습할 수 있음
+- 나중에 /api/listings로 경로만 바꿔도 완벽 호환됨
+
+#### 3. **MSW (Mock Service Worker) 사용 — 실제 API처럼 동작**
+
+> “가짜 백엔드 서버”를 브라우저 위에서 돌려주는 도구.\
+> 백엔드가 없어도 fetch('/api/listings') 같은 코드 그대로 테스트 가능!
+
+설치: `npm install msw --save-dev`
+
+```javascript
+//src/mocks/handlers.js
+
+import { rest } from 'msw';
+
+export const handlers = [
+  rest.get('/api/listings', (req, res, ctx) => {
+    return res(
+      ctx.status(200),
+      ctx.json([
+        { id: 1, title: '서울 강남 한옥 게스트하우스', price: 150000 },
+        { id: 2, title: '제주 감성 독채 숙소', price: 200000 }
+      ])
+    );
+  })
+];
+
+// 사용
+fetch("/api/listings") // 진짜 서버처럼 작동함
+  .then(res => res.json())
+  .then(data => console.log(data));
+```
+
+- API 통신 로직까지 전부 테스트 가능
+- Jest/Storybook 테스트에도 재사용 가능
+
+#### 결론
+
+> 이 고민 과정에서 또 다른 고민이 생겼습니다.\
+> HomePage에서의 SearchBar를 통해 검색 필터링 데이터를 MapPage의 SearchBar에 그대로 보여줘야함\
+> \
+> 그 과정에서 Context를 사용해 프론트에서 데이터를 관리해 백엔드 응답을 기다리지 않고 바로 검색 조건이 보이도록 의도 해야한다.
+
+**부가 설명:**
+
+```
+[HomePage]
+   ↓ (검색 조건 입력)
+   ↓
+   POST /api/search?startDate=...&priceMin=...
+   ↓
+[Backend]
+   ↳ DB 쿼리 실행 (WHERE, LIMIT, SPATIAL FILTER 등)
+   ↳ JSON 결과 반환
+   ↓
+[Frontend (MapPage)]
+   ↳ 응답 데이터를 지도와 리스트로 표시
+   ↳ 단, SearchBar는 여전히 프론트의 상태값 기반으로 표시
+```
