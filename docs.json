@@ -1,17 +1,44 @@
 {
+  "$schema": "https://mintlify.com/docs.json",
   "theme": "mint",
-  "navigation": [
-    {
-      "group": "Getting started",
-      "pages": [
-        { "name": "Introduction", "path": "/" },
-        { "name": "Quickstart", "path": "/quickstart" },
-        { "name": "Development", "path": "/development" }
-      ]
-    },
-    {
-      "group": "Blog",
-      "pages": [{ "name": "Mintlify 블로그 시작하기", "path": "/blog/test" }]
+  "name": "💻 섭지리의 개발 블로그",
+  "colors": {
+    "primary": "#16A34A",
+    "light": "#07C983",
+    "dark": "#15803D"
+  },
+  "favicon": "/favicon.svg",
+  "styling": {
+    "eyebrows": "breadcrumbs"
+  },
+  "navigation": {
+    "tabs": [
+      {
+        "tab": "blog",
+        "groups": [
+          {
+            "group": "Review",
+            "pages": [
+              {
+                "group": "week9",
+                "pages": ["9주차 리뷰 피드백/week9"]
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "navbar": {
+    "primary": {
+      "type": "button",
+      "label": "Dashboard",
+      "href": "https://dashboard.mintlify.com"
     }
-  ]
+  },
+  "footer": {
+    "socials": {
+      "github": "https://github.com/SubJeeLee"
+    }
+  }
 }
