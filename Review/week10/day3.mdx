@@ -1,0 +1,216 @@
+---
+description: "Description of your new file."
+title: "Week10 - Day3"
+---
+
+# [Typescript] Type vs Interface
+
+## **TypeScript에서의 type 과 interface 란?**
+
+TypeScript는 자바스크립트 코드에 **정적 타입(Static Type)** 을 추가하기 위해 만들어졌습니다.
+
+이때 객체, 함수, 배열 등 다양한 구조에 **형태(Shape)** 를 부여하기 위해 사용하는 도구가
+
+**type**과 **interface**입니다.
+
+> 많은 사람들이 두 키워드의 차이를 느끼지 못하고 저 역시도 큰 기준 없이 두 키워드를 혼용해서 사용했다...
+>
+> 이번에 좋은 기회로 리뷰어님께서 type과 interface의 차이를 명확하게 알고 사용하는 것이 중요하다고 코멘트를 남겨주셔서 한번 차이점을 정리해보겠습니다!
+
+한 가지 주의해야할 점은 공식 문서에서도 볼 수 있듯이
+
+> “Interfaces and type aliases are very similar, and in many cases you can use either.”\
+> — [TypeScript Handbook: Interfaces vs Type Aliases](https://www.typescriptlang.org/docs/handbook/2/everyday-types.html#interfaces-vs-type-aliases)
+
+즉, **둘 다 객체 타입을 정의하는 기능은 동일**하며,
+
+“이건 무조건 interface로, 저건 무조건 type으로!”라는 **절대적인 규칙은 존재하지 않는다**고 명시되어 있습니다.
+
+## 주요 차이점과 사용 시점
+
+### 1. 선언 병합 (Declaration Merging)
+
+인터페이스는 **나중에 확장**할 수 있지만, \
+타입은 그렇지 않습니다.\
+\
+이 기능을 \*\*“선언 병합”\*\*이라고 합니다.
+
+```tsx
+// 인터페이스는 병합 가능
+interface Animal {
+  name: string;
+}
+
+interface Animal {
+  age: number;
+}
+
+const dog: Animal = {
+  name: "Rex",
+  age: 5,
+}; // 정상 작동
+-------------------------------------------
+
+// 타입은 병합 불가 X
+type Vehicle = {
+  brand: string;
+};
+
+type Vehicle = {
+  model: string;
+}; // 오류: 중복 식별자 'Vehicle'
+```
+
+### 2. 상속과 구현 (Inheritance & Implementation)
+
+두 문법 모두 상속할 수 있지만, **인터페이스의 문법이 객체지향 스타일에 더 자연스럽습니다.**
+
+```tsx
+// 인터페이스 상속
+interface Animal {
+  name: string;
+}
+
+interface Dog extends Animal {
+  breed: string;
+}
+
+// 타입 상속 (교차 타입 사용)
+type Animal = {
+  name: string;
+};
+
+type Dog = Animal & {
+  breed: string;
+};
+
+// 클래스 구현
+interface Moveable {
+  move(): void;
+  getPosition(): { x: number; y: number };
+}
+
+class Car implements Moveable {
+  move() {
+    console.log("Moving…");
+  }
+  getPosition() {
+    return { x: 0, y: 0 };
+  }
+}
+```
+
+### 3. 함수 타입
+
+TypeScript에서 함수 타입을 정의하는 방법은 type과 interface 둘 다 가능합니다.
+
+하지만 **실무에서는 type을 더 자주 사용**합니다.
+
+```tsx
+// 간결한 타입 문법
+type ClickHandler = (event: MouseEvent) => void;
+
+// 인터페이스 버전 (더 장황)
+interface ClickHandlerInterface {
+  (event: MouseEvent): void;
+}
+```
+
+1. type은 **화살표 함수 문법처럼 직관적**이라 읽기 쉽습니다.
+2. interface는 함수 시그니처를 표현할 수 있지만, 문법이 일반 객체 구조와 다르고 길어집니다.
+
+### **4. 유틸리티 타입(Utility Type)**
+
+유틸리티 타입이란
+
+- **기존 타입을 변형해서 새로운 타입을 쉽게 만드는 타입 도구**입니다.
+
+즉, 이미 정의된 타입을 **부분 선택하거나(Omit, Pick)**
+
+**읽기 전용(Readonly)** 으로 바꾸거나,
+
+**선택적(Optional)** 으로 만드는 등의 “타입 변형기”라고 생각하면 됩니다.
+
+```tsx
+interface User {
+  id: number;
+  name: string;
+  age: number;
+}
+
+// Pick: 일부 속성만 선택
+type UserPreview = Pick<User, "id" | "name">;
+
+// Omit: 특정 속성만 제외
+type UserWithoutAge = Omit<User, "age">;
+
+// Partial: 모든 속성을 선택적으로 변경
+type UserOptional = Partial<User>;
+```
+
+interface는 이런 조합이 거의 불가능하거나, 훨씬 복잡한 문법이 필요합니다.
+
+따라서 **타입 조합 / 조건 / 변형이 많은 상황에서는 type이 압도적으로 유리**합니다.
+
+```tsx
+type ApiResponse<T> = {
+  data: T;
+  status: number;
+};
+
+// 유니언 + 유틸리티 조합
+type UserResponse = ApiResponse<Partial<User> | null>;
+```
+
+## 언제 type vs. interface를 사용하는가
+
+#### **[Interface]**
+
+기존의 구조를 결합하거나 수정해야 할 때 interface를 사용할 수 있다. 만약 특정 라이브러리를 사용하거나 새로운 라이브러리를 만들 때 interface는 가장 좋은 선택지가 될 수 있다. 
+
+interface는 기존 코드를 더 쉽게 만들면서 선언한 것들을 병합하거나 확장하기에 용이하다. 그래서 또한 OOP의 관점에서 생각할 때 가독성이 좋은 코드를 만들 수 있게 된다.
+
+#### **[Type]**
+
+Type은 더 강력한 기능을 요구할 때 고를 수 있을 것이다. TypeScript의 타입 시스템은 조건부 타입(conditional type), 제네릭 타입(generic), 타입 가드(type guard) 등등의 더욱 심화된 도구들을 제공해준다.
+
+ 이러한 기능들은 우리에게 타입 통제를 쉽게 할 수 있게 해줄 뿐 아니라 코드의 강인함을 만들어주기도 하며, 강력하게 타입화된 애플리케이션을 만들 수 있게 해줄 것이다. 하지만 Interface는 이러한 측면에서 제약이 있다.
+
+type과 interface를 본인 선호에 따라 둘 다 사용할 수 있는 경우들이 존재하는데 다음 상황들에서는 type alias를 사용해보자.
+
+- 기본 데이터 타입에 대해 새로운 이름을 붙이고 싶을 때(ex. 'string' or 'number')
+- union, tuple, function과 같은 더 복잡한 타입을 정의할 때
+- 함수를 재정의(overload)할 때
+- mapped type, conditional type, type guard처럼 고도된 기능을 사용할 때
+
+## **그래서 내 예제(Calendar02Props)에서는?**
+
+![Type Interface Pn](/images/Review/week10/type_interface.png)
+
+```tsx
+type Calendar02Props = {
+  value?: DateRange;
+  onChange: (range?: DateRange) => void;
+};
+```
+
+이 경우는 **단순히 컴포넌트의 Props 형태를 정의하는 목적**이기 때문에,
+
+유틸리티 조합보다는 **구조적인 “형태 정의”** 에 가깝습니다.
+
+그리고 나중에 Calendar02 컴포넌트가 **확장 가능성** 높다.\
+(예: disabledDates, minDate, maxDate 같은 속성 추가)
+
+따라서 **interface로 바꾸는 게 더 자연스럽고 확장성도 좋습니다.**
+
+```tsx
+interface Calendar02Props {
+  value?: DateRange;
+  onChange: (range?: DateRange) => void;
+}
+```
+
+### References
+
+- https://cdragon.tistory.com/entry/TypeScript-%ED%83%80%EC%9E%85%EC%8A%A4%ED%81%AC%EB%A6%BD%ED%8A%B8-interface-vs-type
+- https://medium.com/%40leivadiazjulio/typescript-types-vs-interfaces-a-practical-guide-afdc8fef7515
