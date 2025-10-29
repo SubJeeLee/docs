@@ -1,0 +1,147 @@
+---
+title: "New file"
+description: "Description of your new file."
+---
+
+# Context vs URL(useParams / useSearchParams)
+
+> 이전에 HomePage에서의 검색 결과를 MapPage에서 어떻게 데이터를 전달 받고 관리할지, **검색 상태 관리**에 대해서 고민 해본 과정을 정리해봤습니다.
+
+## **왜 Context가 “지금은 과한 선택”인가?**
+
+현재 구조를 보면 👇
+
+```
+SearchBar
+ ├── CalendarSelector
+ ├── PriceSelector
+ └── GuestSelector
+```
+
+모든 Selector가 **SearchBar 바로 아래에 위치**합니다.
+
+즉, “한 단계 아래 자식 컴포넌트”까지만 데이터를 전달하면 됩니다.
+
+이건 전형적인 **props drilling이 거의 없는 케이스**!
+
+단 1단계만 내려가면 되기 때문에 useState로 충분하다고 생각합니다.
+
+## **Context가 유용한 경우 (비교 예시)**
+
+Context가 진짜로 필요한 건 이런 경우 👇
+
+- SearchBar가 여러 페이지에 흩어져 있고,
+
+  예를 들어 HomePage, MapPage, FilterSidebar 모두 같은 상태를 써야 한다면
+- SearchFilter가 다른 Feature들과도 엮여서
+
+  (예: 추천 숙소 API, 최근 검색 기록, 캐싱된 필터 저장 등)
+
+  여러 곳에서 읽거나 수정해야 할 때
+- 상태의 Depth가 깊어서 props를 3~4단계 이상 전달해야 할 때
+
+지금은 전혀 그런 상황이 아닌 것 같다..
+
+**“한 페이지 안에서만 쓰이고, 한 단계 아래만 내려가는 단방향 구조”**입니다.
+
+그리고 **HomePage(Search) - MapPage(Search) **\
+이 연결고리는 URL의 Params로 검색 데이터를 가져와서 사용하는 모습이 일반적인 것 같습니다.
+
+## **왜 URL Params를 선택했는가?**
+
+앞서 이야기했던 것 처럼,
+
+처음에는 Context를 통해 검색 데이터를 전역 상태로 관리하려 했습니다.
+
+HomePage의 SearchBar에서 사용자가 날짜, 가격, 인원 수를 입력하면
+
+그 상태를 Context로 저장하고, MapPage에서도 같은 Context를 구독해
+
+검색 결과를 보여주는 구조를 설계했었습니다.
+
+하지만 구현을 진행하면서 “이건 **앱 전역 상태 관리라기보단 페이지 간 데이터 전달** 문제”라는 걸 깨달았습니다.
+
+- Home → Map 페이지로 이동할 때 React Router를 통해 페이지 전환이 발생합니다.
+- Context는 전역 상태이긴 하지만, 페이지 이동 시 유지하려면 Provider를 App 루트까지 끌어올려야 하고,
+
+  나중에 다른 기능들과 얽히면 유지보수 복잡도가 커집니다.
+- 반면, **검색 조건은 페이지 URL 자체로 표현 가능한 상태**입니다.
+
+  (날짜, 가격, 게스트 수는 모두 직렬화 가능한 값이기 때문입니다.)
+
+즉, 이건 상태(state)가 아니라 **“조회 조건(query)”**입니다.
+
+→ “서버에서 어떤 데이터를 조회할 것인가”에 대한 정보니까, URL Params로 관리하는 게 맞다는 결론에 도달했습니다
+
+## **어떻게 구현했는가?**
+
+### **1.  검색 시점**
+
+HomePage의 SearchBar에서 사용자가 날짜, 가격, 게스트 수를 선택한 뒤
+
+“**검색**” 버튼을 클릭하면,
+
+아래 코드처럼 입력값들을 **URLSearchParams**에 담아 /map으로 이동시킵니다.
+
+```tsx
+const handleSearch = () => {
+  const params = new URLSearchParams();
+
+  if (filters.startDate) params.set("startDate", filters.startDate);
+  if (filters.endDate) params.set("endDate", filters.endDate);
+  if (filters.priceMin) params.set("priceMin", String(filters.priceMin));
+  if (filters.priceMax) params.set("priceMax", String(filters.priceMax));
+  if (filters.guests) params.set("guests", String(filters.guests));
+
+  navigate(`/map?${params.toString()}`);
+};
+```
+
+이렇게 하면 사용자가 선택한 검색 조건이
+
+-\> URL 형태로 `/map?startDate=10월+15일&priceMin=100000&guests=3`
+
+처럼 전달됩니다.
+
+### **2.  MapPage 진입 시점**
+
+MapPage에서는 React Router의 useSearchParams 훅을 사용해
+
+이 URL에 담긴 데이터를 그대로 읽어옵니다 
+
+```tsx
+const [params] = useSearchParams();
+
+const startDate = params.get("startDate") || "";
+const endDate = params.get("endDate") || "";
+const priceMin = Number(params.get("priceMin")) || 0;
+const priceMax = Number(params.get("priceMax")) || 0;
+const guests = Number(params.get("guests")) || 0;
+
+const filters = { startDate, endDate, priceMin, priceMax, guests };
+```
+
+이제 MapPage는 Context 없이도
+
+**URL 자체를 단일 진실 소스(single source of truth)** 로 사용합니다.
+
+검색 조건이 URL에 완전히 표현되어 있기 때문에,
+
+- 새로고침해도 값이 유지되고,
+- URL 공유만으로도 같은 검색 결과를 재현할 수 있습니다.
+
+### 3. 서버와 연동하기
+
+MapPage에서는 위에서 읽은 Params를 그대로 백엔드 API에 전달합니다.
+
+```tsx
+useEffect(() => {
+  const fetchListings = async () => {
+    const queryString = params.toString();
+    const response = await axios.get(`/api/v1/search?${queryString}`);
+    setListings(response.data);
+  };
+
+  fetchListings();
+}, [params]);
+```
