@@ -18,7 +18,9 @@
         "groups": [
           {
             "group": "Review",
-            "pages": ["Review/week9", "Review/test"]
+            "pages": [
+              "week10/day1", "week10/day2"
+            ]
           }
         ]
       }
