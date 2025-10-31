@@ -1,0 +1,268 @@
+---
+title: "week10 - CS Quiz"
+description: "Description of your new file."
+---
+
+# OAuth 2.0을 사용하는 이유와 동작 원리
+
+> “비밀번호를 직접 공유하지 않고도, 다른 애플리케이션이 내 리소스에 접근할 수 있게 하기 위함”
+
+- 기존 방식: 사용자가 아이디/비밀번호를 직접 타 서비스에 입력 → 보안 위험 큼 ⚠️
+- OAuth2: **Access Token** 기반으로 “권한 위임”을 수행 → 비밀번호 노출 없이 인증 가능
+
+즉, “인증(Authentication)”보다 “인가(Authorization)”에 초점을 둔 프로토콜입니다.
+
+### **OAuth2 주요 구성요소와 역할**
+
+| **구성 요소**                | **역할**                                 |
+| :----------------------- | :------------------------------------- |
+| **Resource Owner**       | 사용자 (리소스의 실제 소유자)                      |
+| **Client**               | 리소스에 접근하려는 앱 (예: 카카오톡 로그인 버튼을 단 웹 서비스) |
+| **Resource Server**      | 실제 보호된 데이터(API 서버)                     |
+| **Authorization Server** | 인증 및 토큰 발급 담당 서버                       |
+
+### 로그인 및 리소스 요청 과정 예시 
+
+**예시 시나리오**
+
+> 내 앱에서 “Google 계정으로 로그인”을 제공한다고 가정합니다.
+
+1. **사용자 인증 요청 (Authorization Code 발급 요청)**
+
+- Client(내 앱)는**https://accounts.google.com/auth** 로 리다이렉트
+- 사용자가 로그인하면 Authorization Server(Google)가 **인가 코드(code)** 발급
+
+```
+GET https://accounts.google.com/o/oauth2/auth?
+  client_id=abc123&
+  redirect_uri=https://myapp.com/callback&
+  response_type=code&
+  scope=email profile
+```
+
+2. **Access Token 교환**
+
+- Client는 받은 code를 Authorization Server로 전달
+- 서버는 **Access Token**을 응답으로 반환
+
+```
+POST https://oauth2.googleapis.com/token
+Content-Type: application/x-www-form-urlencoded
+
+code=AUTH_CODE&client_id=abc123&client_secret=xyz456&
+redirect_uri=https://myapp.com/callback&grant_type=authorization_code
+```
+
+응답:
+
+```json
+{
+  "access_token": "ya29.a0AfH6SMD...",
+  "expires_in": 3599,
+  "token_type": "Bearer"
+}
+```
+
+3. **리소스 요청**
+
+- Client는 Access Token을 사용해 Resource Server에 요청
+
+```
+GET https://www.googleapis.com/userinfo/v2/me
+Authorization: Bearer ya29.a0AfH6SMD...
+```
+
+응답:
+
+```json
+{
+  "id": "1122334455",
+  "email": "user@gmail.com",
+  "name": "홍길동"
+}
+```
+
+# SPA(Single Page Application)의 라우팅 동작 방식
+
+### **SPA란?**
+
+> 하나의 HTML 문서에서 자바스크립트가 동적으로 페이지 전환을 제어하는 구조
+
+- 최초 로드 시 HTML + JS + CSS 한 번만 받아옴
+- 이후 페이지 전환은 JS에서 처리 → 서버에 새 요청 X
+
+### **라우팅의 핵심은 브라우저의 History API**
+
+> pushState()와 popstate 이벤트로 URL만 바꾸고 페이지를 다시 그리지 않음
+
+#### **예시: React Router 내부 동작 원리**
+
+```tsx
+import { useNavigate } from "react-router-dom";
+
+const Button = () => {
+  const navigate = useNavigate();
+
+  return <button onClick={() => navigate("/map")}>지도 페이지 이동</button>;
+};
+```
+
+실제로는 이렇게 동작합니다:
+
+```javascript
+window.history.pushState({}, '', '/map');
+```
+
+- 브라우저 주소창의 URL이 /map으로 변경되지만
+
+  **서버 요청 없이 JS가 해당 라우트의 컴포넌트를 렌더링**
+- 뒤로가기(popstate 이벤트) 시, React Router가 이전 컴포넌트를 복원
+
+### **브라우저 렌더링 구조와 연결**
+
+| **단계** | **설명**                                           |
+| :----- | :----------------------------------------------- |
+| 1️⃣    | SPA 초기 HTML + JS 로드                              |
+| 2️⃣    | JS가 DOM 렌더링 및 Router 초기화                         |
+| 3️⃣    | URL 변경 시, 브라우저는 새 요청 X —\> Router가 내부적으로 컴포넌트 교체 |
+| 4️⃣    | 필요한 경우만 API 통신 (데이터 갱신)                          |
+
+# NestJS 요청 처리 파이프라인 (POST /users 예시)
+
+### **NestJS의 핵심 구조**
+
+> 요청이 들어오면 컨트롤러까지 단번에 도달하지 않고,\
+> 여러 계층(Middleware → Guard → Interceptor → Pipe)을 거쳐 처리된다.
+
+### **요청 흐름 순서**
+
+```
+Client → Middleware → Guard → Interceptor(before)
+→ Pipe → Controller → Service → Interceptor(after)
+→ Response
+```
+
+### **POST /users 요청 흐름 예시**
+
+1. **Client (요청 전송)**
+
+```json
+POST /users
+Content-Type: application/json
+
+{
+  "email": "test@example.com",
+  "password": "1234"
+}
+```
+
+2. **Middleware**
+
+- 요청 전처리 단계 (로깅, CORS, 인증 토큰 추출 등)
+
+```typescript
+@Injectable()
+export class LoggerMiddleware implements NestMiddleware {
+  use(req: Request, res: Response, next: NextFunction) {
+    console.log(`[${req.method}] ${req.url}`);
+    next(); // 다음 단계로 전달
+  }
+}
+```
+
+ 3. **Guard**
+
+- “이 요청을 수행할 자격이 있는가?” (권한, 인증 검사)
+
+```typescript
+@Injectable()
+export class AuthGuard implements CanActivate {
+  canActivate(context: ExecutionContext) {
+    const request = context.switchToHttp().getRequest();
+    return request.headers.authorization === "Bearer VALID_TOKEN";
+  }
+}
+```
+
+4. **Interceptor (요청 전)**
+
+- 로깅, 캐싱, 응답 포맷팅 등 cross-cutting concern 처리
+
+```typescript
+@Injectable()
+export class LoggingInterceptor implements NestInterceptor {
+  intercept(context: ExecutionContext, next: CallHandler) {
+    console.log("Before handling...");
+    return next.handle().pipe(tap(() => console.log("After handling...")));
+  }
+}
+```
+
+5. **Pipe**
+
+- DTO 검증, 타입 변환
+
+```typescript
+@Post()
+create(@Body(new ValidationPipe()) createUserDto: CreateUserDto) {
+  return this.userService.create(createUserDto);
+}
+```
+
+6. **Controller**
+
+- 실제 요청 엔드포인트
+
+```typescript
+@Controller('users')
+export class UserController {
+  constructor(private readonly userService: UserService) {}
+
+  @Post()
+  create(@Body() dto: CreateUserDto) {
+    return this.userService.create(dto);
+  }
+}
+```
+
+7. **Service**
+
+- 비즈니스 로직 처리 (DB 저장 등)
+
+```typescript
+@Injectable()
+export class UserService {
+  create(dto: CreateUserDto) {
+    return { message: `User ${dto.email} created successfully` };
+  }
+}
+```
+
+8. Response 
+
+```json
+{
+  "message": "User test@example.com created successfully"
+}
+```
+
+### **요약 테이블**
+
+| **단계**      | **역할**        | **예시**          |
+| :---------- | :------------ | :-------------- |
+| Middleware  | 공통 로깅, 요청 전처리 | 요청 로깅           |
+| Guard       | 권한 검사         | JWT 인증          |
+| Interceptor | 전/후 처리, 응답 변환 | 실행 시간 로깅        |
+| Pipe        | DTO 변환 및 검증   | class-validator |
+| Controller  | 요청 엔드포인트      | POST /users     |
+| Service     | 비즈니스 로직       | DB 저장 후 반환      |
+
+> NestJS는 요청을 단순히 “컨트롤러에서 받는 것”이 아니라,
+>
+> 여러 레이어를 거쳐 검증·권한·로깅 등을 수행한 후 최종적으로 비즈니스 로직으로 전달하는 구조입니다.
+>
+> 이 덕분에 관심사를 분리하고,
+>
+> **“미들웨어는 공통 로직, 가드는 접근 제어, 파이프는 데이터 검증”**처럼
+>
+> 각 단계를 명확히 분리하여 유지보수성과 확장성을 높일 수 있습니다.
