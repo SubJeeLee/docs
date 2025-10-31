@@ -3,27 +3,36 @@ title: "Week10 - Day4"
 description: "Description of your new file."
 ---
 
-```tsx
-<button
-        onClick={() => window.location.reload()}
-        className="absolute right-3 top-3 rounded-full bg-white p-1 shadow-sm"
-      >
-        <X size={18} />
-      </button>
-```
-
-```tsx
-<button
-        onClick={onClose}
-        className="absolute right-3 top-3 rounded-full bg-white p-1 shadow-sm"
-      >
-        <X size={18} />
-      </button>
-```
-
-## **Kakao 지도 SDK의 비동기 로딩 문제**
+# **Kakao 지도 SDK의 비동기 로딩 문제**
 
 > 처음에는 마커가 잘 뜨다가, 새로고침하거나 클릭할 때 가끔 마커가 사라진다
+
+KakaoMap SDK를 비동기로 로딩하도록 구현했을 때,
+
+처음에는 지도와 마커가 정상적으로 표시되지만
+
+**페이지를 새로고침하거나, 특정 시점에 클릭 이벤트가 발생하면 마커가 사라지는 현상**이 발생했습니다.
+
+특히 **같은 코드가 어떤 상황에서는 정상적으로 동작하고, 어떤 상황에서는 실패**하는 비일관적인 동작이라 원인 파악이 쉽지 않았습니다.
+
+### **🔍 문제 분석 window.kakao.maps 가 완전히 로드되기 전에 접근**
+
+script.onload 콜백 내부에서 바로 window.kakao.maps.load()를 호출했는데,
+
+일부 브라우저 환경에서는 **SDK가 완전히 초기화되기 전에** 콜백이 실행되어
+
+window.kakao 객체가 **undefined 상태**로 접근되는 타이밍 이슈가 발생했습니다.
+
+즉, 아래 코드가 실행될 때 아직 window.kakao가 준비되지 않은 경우가 있었던 것이죠.
+
+```tsx
+script.onload = () => {
+  // SDK 초기화가 아직 끝나지 않은 시점
+  window.kakao.maps.load(() => {
+    ...
+  });
+};
+```
 
 ```tsx
 import { useEffect, useRef } from "react";
@@ -69,17 +78,33 @@ export default function KakaoMap({
 }
 ```
 
-### **“cleanup에서 script 삭제 금지”**
+### **cleanup 단계에서 script 제거 → 다음 렌더에서 SDK 사라짐**
+
+React의 useEffect는 컴포넌트가 재렌더링될 때마다 **기존 effect를 cleanup한 후 다시 실행**합니다.
+
+그런데 기존 코드에서는 cleanup에서 아래처럼 스크립트를 삭제하고 있었습니다.
+
+```tsx
+return () => {
+  document.head.removeChild(script);
+};
+```
 
 기존에는 useEffect의 cleanup에서
 
 document.head.removeChild(script)를 호출하고 있었는데,
 
-이게 문제였습니다 ❌
-
 React는 리렌더링될 때마다 cleanup → 다시 mount 순으로 실행하기 때문에,
 
-**스크립트가 로드되기 전에 삭제되어버리는 경우**가 있었어요.
+**스크립트가 로드되기 전에 삭제되어버리는 경우**가 있었습니다.
+
+결과적으로,
+
+- React가 리렌더링되면 cleanup → script 삭제
+- 다음 effect에서 다시 script 추가
+- 그러나 아직 SDK가 완전히 로드되기 전에 **cleanup이 먼저 실행되는 시점 발생**
+
+이 순환 구조로 인해 **window.kakao 객체가 로드되기도 전에 사라지는** 문제가 생겼습니다.
 
 → 해결책: **SDK는 한 번 로드되면 계속 유지**
 
@@ -91,13 +116,19 @@ return () => {
 
 ### **“SDK 중복 로드 방지” 로직 추가**
 
-이미 로드된 Kakao SDK가 있다면 다시 추가하지 않고 그대로 재사용하도록 변경했습니다.
+> 이미 로드된 Kakao SDK가 있다면 다시 추가하지 않고 그대로 재사용하도록 변경했습니다.
+
+cleanup에서 삭제하지 않게 되면,
+
+React가 리렌더링될 때 useEffect가 재실행되면서
+
+동일한 Kakao SDK 스크립트가 중복 추가되는 문제가 생깁니다.
 
 ```tsx
 const existingScript = document.querySelector(`script[src="${SDK_URL}"]`);
 if (existingScript) {
   if (window.kakao && window.kakao.maps) {
-    initMap(); // ✅ 이미 로드된 경우 바로 지도 초기화
+    initMap(); // 이미 로드된 경우 바로 지도 초기화
   } else {
     existingScript.addEventListener("load", initMap); // 아직 로딩 중이면 로드 후 실행
   }
@@ -108,3 +139,33 @@ if (existingScript) {
 이렇게 하면 스크립트가 중복 추가되거나 삭제되지 않아
 
 window.kakao 객체를 항상 안정적으로 접근할 수 있습니다.
+
+## **Preview 닫기 시 새로고침 현상 제거**
+
+> 초기에는 ListingPreview의 닫기 버튼이 단순히 페이지 전체를 새로고침하도록 되어 있었습니다.
+
+```tsx
+<button
+        onClick={() => window.location.reload()} // 전체 새로고침
+        className="absolute right-3 top-3 rounded-full bg-white p-1 shadow-sm"
+      >
+        <X size={18} />
+      </button>
+```
+
+이 때문에 preview를 닫을 때마다 **지도 상태, 확대/축소, 마커 정보가 전부 초기화되는 문제**가 있었습니다.
+
+이를 컴포넌트 단위의 상태 업데이트로 교체했습니다.
+
+```tsx
+<button
+        onClick={onClose}
+        className="absolute right-3 top-3 rounded-full bg-white p-1 shadow-sm"
+      >
+        <X size={18} />
+      </button>
+```
+
+이제는 onClose를 통해 selected 상태만 초기화되며,
+
+지도는 그대로 유지되고 preview UI만 사라지도록 작동합니다.
