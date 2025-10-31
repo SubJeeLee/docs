@@ -1,0 +1,110 @@
+---
+title: "Week10 - Day4"
+description: "Description of your new file."
+---
+
+```tsx
+<button
+        onClick={() => window.location.reload()}
+        className="absolute right-3 top-3 rounded-full bg-white p-1 shadow-sm"
+      >
+        <X size={18} />
+      </button>
+```
+
+```tsx
+<button
+        onClick={onClose}
+        className="absolute right-3 top-3 rounded-full bg-white p-1 shadow-sm"
+      >
+        <X size={18} />
+      </button>
+```
+
+## **Kakao 지도 SDK의 비동기 로딩 문제**
+
+> 처음에는 마커가 잘 뜨다가, 새로고침하거나 클릭할 때 가끔 마커가 사라진다
+
+```tsx
+import { useEffect, useRef } from "react";
+
+export default function KakaoMap({
+  center,
+  level = 6,
+}: {
+  center: { lat: number; lng: number };
+  level?: number;
+}) {
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const appkey = import.meta.env.VITE_KAKAO_MAP_KEY;
+    const url = `//dapi.kakao.com/v2/maps/sdk.js?appkey=${appkey}&autoload=false`;
+    const script = document.createElement("script");
+    script.src = url;
+    script.async = true;
+    document.head.appendChild(script);
+
+    script.onload = () => {
+      // ❌ 문제 발생 지점: kakao가 아직 완전히 로드되지 않았는데 접근 시도
+      // @ts-expect-error kakao is global
+      window.kakao.maps.load(() => {
+        if (!ref.current) return;
+        // @ts-expect-error kakao is global
+        const kakao = window.kakao;
+        new kakao.maps.Map(ref.current, {
+          center: new kakao.maps.LatLng(center.lat, center.lng),
+          level,
+        });
+      });
+    };
+
+    // ❌ 문제 2: cleanup에서 스크립트를 제거 → 다음 렌더에서 kakao 사라짐
+    return () => {
+      document.head.removeChild(script);
+    };
+  }, [center.lat, center.lng, level]);
+
+  return <div ref={ref} style={{ width: "100%", height: "100%" }} />;
+}
+```
+
+### **“cleanup에서 script 삭제 금지”**
+
+기존에는 useEffect의 cleanup에서
+
+document.head.removeChild(script)를 호출하고 있었는데,
+
+이게 문제였습니다 ❌
+
+React는 리렌더링될 때마다 cleanup → 다시 mount 순으로 실행하기 때문에,
+
+**스크립트가 로드되기 전에 삭제되어버리는 경우**가 있었어요.
+
+→ 해결책: **SDK는 한 번 로드되면 계속 유지**
+
+```tsx
+return () => {
+  // document.head.removeChild(script); ❌ 제거하지 않음
+};
+```
+
+### **“SDK 중복 로드 방지” 로직 추가**
+
+이미 로드된 Kakao SDK가 있다면 다시 추가하지 않고 그대로 재사용하도록 변경했습니다.
+
+```tsx
+const existingScript = document.querySelector(`script[src="${SDK_URL}"]`);
+if (existingScript) {
+  if (window.kakao && window.kakao.maps) {
+    initMap(); // ✅ 이미 로드된 경우 바로 지도 초기화
+  } else {
+    existingScript.addEventListener("load", initMap); // 아직 로딩 중이면 로드 후 실행
+  }
+  return;
+}
+```
+
+이렇게 하면 스크립트가 중복 추가되거나 삭제되지 않아
+
+window.kakao 객체를 항상 안정적으로 접근할 수 있습니다.
