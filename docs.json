@@ -25,7 +25,7 @@
           {
             "group": "Group-Project",
             "pages": [
-              "Group-Project/web30/backlog"
+              "Group-Project/web30/backlog", "Group-Project/web30/Optimistic_Update"
             ]
           }
         ]
