@@ -2,7 +2,7 @@
 title: "파일 구조"
 ---
 
-# React 프로젝트 구조 
+# React 프로젝트 구조
 
 > “정답은 없습니다. 하지만 자주 함께 변경되는 파일은 가까이에 두세요.”\
 > — React 공식 문서, [_파일 구조(FAQ)_](https://ko.legacy.reactjs.org/docs/faq-structure.html)
@@ -29,7 +29,7 @@ profile/
 ```
 
 ➜ 즉, 한 기능(Feed, Profile)에 필요한 모든 파일을 **같은 폴더에 모아두는 방식**입니다.\
-이게 바로 _“코로케이션(colocation)”_의 핵심 철학이에요.
+이게 바로 \_“코로케이션(colocation)”\_의 핵심 철학이에요.
 
 2. **파일 유형(Type) 기반 구조**
 
@@ -50,7 +50,7 @@ utils/
 
 ## Layered + Colocation 구조란?
 
-이 가이드는 바로 그 _“혼합형 접근법”_을 명시적으로 적용한 형태입니다.\
+이 가이드는 바로 그 \_“혼합형 접근법”\_을 명시적으로 적용한 형태입니다.\
 즉,
 
 - 전역적으로 공통 역할(`components`, `services`, `hooks`, `utils`)은 **Layered 구조**로 관리하고,
@@ -65,70 +65,76 @@ utils/
 
 ```
 src/
-├── app/                               # 전역 라우팅 및 Provider 관리
+├── app/                               # 앱 전역 설정 (라우터, Provider 등)
 │   ├── App.tsx
 │   ├── Router.tsx
 │   ├── providers/
-│   │   ├── ThemeProvider.tsx
 │   │   ├── QueryClientProvider.tsx
+│   │   ├── ThemeProvider.tsx
 │   │   └── ErrorBoundaryProvider.tsx
 │   └── index.ts
 │
-├── components/                        # 전역 공용 컴포넌트
+├── components/                        # 공용 UI 컴포넌트 (여러 페이지에서 재사용)
 │   ├── Button/
 │   │   ├── Button.tsx
 │   │   └── index.ts
-│   └── TerminalInput/
-│       ├── TerminalInput.tsx
-│       └── index.ts
-│
-├── pages/                             # 주요 기능 단위(Colocation 적용)
-│   ├── SystemBoot/
-│   │   ├── SystemBootPage.tsx
-│   │   ├── hooks/
-│   │   │   └── useBoot.ts
-│   │   ├── services/
-│   │   │   └── bootService.ts
-│   │   └── components/
-│   │       └── BootStatus.tsx
-│   │
-│   ├── Syscall/
-│   │   ├── SyscallPage.tsx
-│   │   ├── hooks/
-│   │   │   └── useSyscall.ts
-│   │   ├── services/
-│   │   │   └── syscallService.ts
-│   │   └── components/
-│   │       ├── SyscallTerminal.tsx
-│   │       └── SyscallResult.tsx
-│   │
-│   └── NotFound/
-│       └── NotFoundPage.tsx
-│
-├── services/                          # 공용 API 설정
-│   ├── apiClient.ts
-│   ├── endpoints.ts
+│   ├── TerminalInput/
+│   │   ├── TerminalInput.tsx
+│   │   └── index.ts
 │   └── index.ts
 │
-├── hooks/                             # 전역 훅
+├── pages/
+│   ├── SystemBoot/
+│   │   ├── SystemBootPage.tsx         # 부팅 페이지
+│   │   ├── hooks/
+│   │   │   └── useBoot.ts             # 부팅 관련 커스텀 훅
+│   │   ├── services/
+│   │   │   └── bootService.ts         # /system/boot API 호출
+│   │   └── components/
+│   │       └── BootStatus.tsx         # 부팅 상태 표시 UI
+│   │
+│   ├── Syscall/
+│   │   ├── SyscallPage.tsx            # 명령어 입력/출력 페이지
+│   │   ├── hooks/
+│   │   │   └── useSyscall.ts          # /syscall API 통신용 훅
+│   │   ├── services/
+│   │   │   └── syscallService.ts      # 명령어 실행 API
+│   │   └── components/
+│   │       ├── SyscallTerminal.tsx    # 명령어 콘솔 UI
+│   │       └── SyscallResult.tsx      # 실행 결과 출력 UI
+│   │
+│   ├── NotFound/
+│   │   └── NotFoundPage.tsx
+│   │
+│   └── index.tsx
+│
+├── services/                          # 전역 API 관련 설정
+│   ├── apiClient.ts                   # axios instance
+│   ├── endpoints.ts                   # API 엔드포인트 정의
+│   └── index.ts
+│
+├── hooks/                             # 전역 커스텀 훅
 │   ├── useToast.ts
 │   ├── useTheme.ts
 │   └── index.ts
 │
-├── utils/                             # 순수 유틸 함수
+├── utils/                             # 공통 유틸 함수
 │   ├── formatDate.ts
 │   ├── validateCommand.ts
 │   └── index.ts
 │
-├── types/                             # DTO, Response 타입 정의
+├── types/                             # 타입 정의 (DTO, Response 등)
 │   ├── system.ts
 │   ├── syscall.ts
 │   └── index.ts
 │
-└── styles/                            # 전역 스타일
-    ├── theme.ts
-    ├── reset.css
-    └── global.css
+├── styles/                            # 전역 스타일 및 테마
+│   ├── theme.ts
+│   ├── reset.css
+│   ├── typography.ts
+│   └── global.css
+│
+└── main.tsx
 ```
 
 ## 구조 철학 요약
@@ -152,7 +158,7 @@ pages/SystemBoot/
 
 **Colocation 효과:**\
 `SystemBootPage`를 수정할 때 관련된 `useBoot`와 `bootService`를 바로 옆에서 확인 가능.\
-즉, _“작업 단위로 코드가 모여 있다”_는 점이 생산성을 크게 높입니다.
+즉, \_“작업 단위로 코드가 모여 있다”\_는 점이 생산성을 크게 높입니다.
 
 ## React 공식 문서 인용 정리
 
@@ -169,9 +175,9 @@ pages/SystemBoot/
 - React는 특정 폴더 구조를 강제하지 않습니다.
 - **Layered + Colocation 구조**는 “규칙은 느슨하게, 응집도는 높게”라는 React 철학과 잘 맞습니다.
 - 핵심은 **“함께 자주 바뀌는 코드는 가까이에 두는 것”**,\
-  그리고 **“역할(Role)은 명확히 분리하는 것”**입니다.
+  그리고 \*\*“역할(Role)은 명확히 분리하는 것”\*\*입니다.
 
-### 요약 
+### 요약
 
 > “Layered 구조는 명확성을, Colocation 구조는 응집도를 줍니다.\
 > 두 가지를 함께 쓰면, React 앱은 훨씬 유지보수하기 쉬워집니다.”

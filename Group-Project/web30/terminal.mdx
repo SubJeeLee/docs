@@ -1,0 +1,275 @@
+---
+title: "터미널 명령어 구현 학습"
+---
+
+### **오늘의 목표**
+
+- mkdir, ls, cd, pwd 명령어의 동작 원리와 API 설계를 학습하고 실제 구현 방향을 정리한다.
+- 파일 시스템 구조를 설계하며 “메모리 기반 관리 vs DB 저장”의 차이를 파악한다.
+- 디렉토리 간 계층 관계(부모-자식 연결 구조) 설계를 구체화한다.
+
+## **1. 구현 개요**
+
+오늘 구현할 명령어들의 역할은 아래와 같다.
+
+| **명령어** | **기능 요약**          | **구현 포인트**                                |
+| :------ | :----------------- | :---------------------------------------- |
+| mkdir   | 새 디렉토리 생성          | 부모 디렉토리를 찾아 하위 디렉토리로 추가. 메타데이터 생성 및 저장 필요 |
+| ls      | 현재 디렉토리 내 파일/폴더 조회 | 현재 경로 기반으로 하위 요소 탐색 후 목록 반환               |
+| cd      | 다른 디렉토리로 이동        | 현재 작업 디렉토리(cwd) 변경. 유효 경로 검증 필요           |
+| pwd     | 현재 작업 디렉토리 조회      | 사용자의 현재 경로 상태 반환                          |
+
+## **2. 저장 구조 설계 고민**
+
+#### **(1) DB 필요 여부**
+
+- 현재 단계에서는 **파일 시스템 전체를 DB에 저장할 필요는 없음**.
+
+  → 단일 사용자 환경이고, 데이터 영속성이 필수가 아니라면 **메모리 내 구조체(Tree 구조)** 로 관리 가능.
+- 단, “사용자 세션이 끊긴 후에도 디렉토리 구조를 유지해야 한다면” DB 연동 고려.
+
+  → ex) MongoDB 또는 sqlite 로 단순 key-value 구조 (path, metadata) 저장.
+
+#### **(2) 메모리 기반 설계 예시**
+
+```typescript
+interface Directory {
+  name: string;
+  path: string;
+  parent: Directory | null;
+  children: Directory[];
+  createdAt: Date;
+}
+
+let root: Directory = { name: "/", path: "/", parent: null, children: [], createdAt: new Date() };
+let currentDir: Directory = root;
+```
+
+- mkdir → children.push(newDir)
+- cd → currentDir = findDirByPath(path)
+- ls → currentDir.children
+- pwd → currentDir.path
+
+### MORE DETAIL (DB 필요성 여부)
+
+### **1. 메모리 기반 관리 (기본 권장 방식)**
+
+**개념**
+
+- 디렉토리 구조를 **트리(Tree)** 형태로 메모리 상에서 관리.
+- 각 디렉토리는 객체로 존재하며, 부모-자식 관계(parent, children)를 통해 연결됨.
+- 사용자가 mkdir, cd, ls 등을 수행할 때마다 이 메모리 구조를 탐색/수정.
+
+**장점**
+
+- **속도**: DB I/O 없이 즉각적인 CRUD 가능 → 명령 응답이 매우 빠름.
+- **단순성**: 구현이 간단하며, 파일시스템 동작 원리를 학습하기에 가장 적합.
+- **유연성**: 초기 구조 변경이 용이, 디버깅이 쉬움.
+
+**단점**
+
+- **비영속성**: 서버가 재시작되면 모든 구조가 초기화됨.
+- **다중 사용자 환경 부적합**: 동시에 여러 사용자가 접근 시 충돌 위험.
+- **로그 및 복구 불가**: 세션 이력 관리가 불가능.
+
+**사용 예시**
+
+- 학습/실습용 Web OS
+- 단일 사용자 환경 (ex: 1명만 CLI 조작)
+- 서버 종료 후 데이터 유지 필요 X
+
+### **2. 데이터베이스(DB) 기반 관리**
+
+**개념**
+
+- 디렉토리, 파일, 메타데이터를 모두 **테이블 단위**로 관리.
+- 부모-자식 관계를 DB의 **계층형 구조** (self join, parent_id)로 표현.
+- 서버 재시작 시에도 파일 시스템 구조를 그대로 복원 가능.
+
+**장점**
+
+- **영속성**: 재부팅 후에도 디렉토리 구조 유지.
+- **다사용자 지원 용이**: 사용자별 root 디렉토리, 권한 분리 가능.
+- **로그 관리 가능**: 명령 이력, 파일 생성/삭제 내역 기록 가능.
+
+**단점**
+
+- **복잡성 증가**: 계층형 구조를 쿼리로 탐색하는 로직이 복잡.
+- **성능 저하**: 단순 명령(cd, ls)도 DB 조회가 필요 → I/O 비용.
+- **개발 초기에 과도함**: 초기 학습 단계에서는 오버엔지니어링이 될 수 있음.
+
+**사용 예시**
+
+- 다사용자 Web OS 시뮬레이션
+- 영속적인 데이터 관리(예: 메모장 저장, 로그 유지)
+- sudo, root, permission 등 확장 고려 시 
+
+### **3. 중간 단계 (하이브리드 설계)**
+
+**개념**
+
+- 기본은 메모리에서 관리하되, 주기적으로 DB에 스냅샷 저장.
+- 즉, **실행 중에는 휘발성**, 종료 시점에 상태를 백업.
+
+**💡 예시 구조**
+
+```typescript
+// 메모리 상 트리 구조
+let fileSystemTree = { ... };
+
+// 일정 주기마다 DB로 dump
+setInterval(() => {
+  db.save(fileSystemTree);
+}, 60000); // 1분 단위 스냅샷
+```
+
+**장점**
+
+- 성능 유지하면서도 최소한의 복구 가능.
+- 단계적 확장에 유리 (나중에 완전 DB 구조로 이전 가능).
+
+### **4. 이번 프로젝트에 적합한 선택**
+
+| **구분**         | **선택**       | **이유**                            |
+| :------------- | :----------- | :-------------------------------- |
+| **1단계 (MVP)**  | 메모리 기반       | OS 동작 원리 학습이 목적. 구조 단순. 빠른 개발 가능. |
+| **2~3단계 (확장)** | 하이브리드        | 메모장, 로그 기능 추가 시 스냅샷 or 파일로 저장     |
+| **최종 버전**      | DB 기반 (선택사항) | 다사용자, 세션 지속, 파일 시스템 로그 관리 필요 시    |
+
+## **3. 부모-자식 연결 구조**
+
+- 각 디렉토리에는 \*\*부모(parent)\*\*와 \*\*자식(children)\*\*이 있어야 트리 탐색이 가능함.
+- mkdir 수행 시에는 반드시 “현재 작업 경로(cwd)” 기준으로 부모 디렉토리 검색.
+- 경로 탐색 시 루트부터 순차 탐색 (ex: /root/projects/a)
+
+  → 문자열 분리(split("/")) 후 계층적으로 노드를 탐색.
+
+### **mkdir (부모-자식 연결 구조 구현)**
+
+mkdir 은 현재 디렉토리(currentDir)의 children 배열에 새 디렉토리를 추가하고,
+
+**부모 참조(parent)** 를 연결합니다.
+
+```typescript
+function mkdir(dirName: string): string {
+  // 동일 이름 폴더 중복 방지
+  if (currentDir.children.some(child => child.name === dirName)) {
+    return `Error: '${dirName}' already exists in ${currentDir.path}`;
+  }
+
+  // 새 디렉토리 생성
+  const newDir: Directory = {
+    name: dirName,
+    path: currentDir.path === '/' ? `/${dirName}` : `${currentDir.path}/${dirName}`,
+    parent: currentDir,
+    children: [],
+    createdAt: new Date()
+  };
+
+  // 부모 디렉토리에 추가
+  currentDir.children.push(newDir);
+
+  return `Directory '${dirName}' created at ${newDir.path}`;
+}
+```
+
+결과 예시:
+
+```typescript
+# 현재 디렉토리: /
+mkdir projects
+
+# 결과: Directory 'projects' created at /projects
+```
+
+## **4. cd (부모-자식 탐색 구조)**
+
+cd 명령은 현재 디렉토리를 바꾸는 명령입니다.
+
+즉, **부모나 자식 디렉토리를 참조해서 이동**하는 구조죠.
+
+```typescript
+function cd(target: string): string {
+  if (target === '/') {
+    currentDir = root;
+    return `Moved to root: /`;
+  }
+
+  if (target === '..') {
+    if (currentDir.parent) {
+      currentDir = currentDir.parent;
+      return `Moved up to ${currentDir.path}`;
+    }
+    return `Already at root.`;
+  }
+
+  const nextDir = currentDir.children.find(child => child.name === target);
+  if (nextDir) {
+    currentDir = nextDir;
+    return `Moved to ${currentDir.path}`;
+  } else {
+    return `Error: directory '${target}' not found in ${currentDir.path}`;
+  }
+}
+```
+
+## **5. ls (자식 디렉토리 목록 조회)**
+
+```typescript
+function ls(): string[] {
+  if (currentDir.children.length === 0) return ['<empty>'];
+  return currentDir.children.map(child => `${child.name}/`);
+}
+```
+
+## **6. pwd (현재 경로 반환)**
+
+```typescript
+function pwd(): string {
+  return currentDir.path;
+}
+```
+
+## 고민 내용
+
+1. **파일 시스템 구조 설계 방향**
+   - 현재 디렉토리 구조를 **메모리에서 관리**할지, **DB에 저장할지**에 대한 논의가 필요함.
+     - 메모리 방식은 빠르고 간단하지만, 서버 재시작 시 초기화됨.
+     - DB는 영속성은 확보되지만 구현 복잡도가 높음.
+   - 현재 단계에서는 학습 목적상 **메모리 기반 트리 구조로 구현**하는 것이 적합하다고 판단되지만,
+
+     추후 **다사용자 지원, 로그 저장** 등의 기능 확장을 고려할 경우 DB 구조로의 전환이 필요할 수 있음.
+2. **부모–자식 디렉토리 연결 구조**
+   - mkdir 명령 시 새 디렉토리가 어디에 추가되어야 하는지,
+
+     즉 **부모 디렉토리를 어떻게 추적할 것인가**가 핵심 설계 포인트.
+   - 현재는 생각했던 방향은 currentDir을 기준으로 children 배열을 관리하고 있으나,
+
+     향후 경로 기반 접근(cd /root/projects)을 지원하기 위해선
+
+     **절대 경로 탐색 함수(findPath)** 구현이 필요함.
+   - “부모 디렉토리 → 자식 디렉토리”의 관계를 명확히 모델링해두면
+
+     이후 DB 전환 시에도 parent_id 기반 ERD 설계로 확장하기 쉬움.
+3. **명령어 처리 구조의 책임 분리**
+   - 현재 syscall 단일 엔드포인트에서 모든 명령(mkdir, ls, cd, pwd)을 처리 하려고 생각 중.
+   - 명령어가 많아질수록 서비스 로직이 커지므로,
+
+     향후 유지보수를 위해 **Command Handler 패턴**으로 분리하는 방안 고려 하는 방향 추구?
+
+     예:
+
+   ```
+   /system/mkdir
+   /system/ls
+   /system/cd
+   ```
+
+4. **작업 경로(Path) 관리 및 세션 문제**
+
+- 현재는 모든 사용자가 동일한 currentDir(전역 상태)을 공유하고 있음.
+- 향후 다사용자 환경(각자 다른 경로를 탐색하는 구조)을 고려한다면
+
+  사용자 세션별로 독립적인 디렉토리 상태를 관리해야 함.
+  - 방법 ①: 세션 ID 기반 Map 구조로 관리 (Map\<sessionId, currentDir\>)
+  - 방법 ②: JWT 토큰 기반 사용자별 context 유지
