@@ -31,3 +31,51 @@ const [N, M] = lines[0].split(" ").map(Number);
 
 - 첫 줄 "5 4" → N=5, M=4
 - 나머지 줄들은 lines[1]부터 별도로 처리하면 됨
+
+## \
+구조분해 할당 (Destructuring)
+
+구조분해 할당은 배열/객체에서 값을 꺼내 변수에 바로 담는 문법이다.
+
+### 배열 구조분해
+
+```javascript
+const arr = [10, 20, 30];
+const [a, b] = arr;
+console.log(a, b); // 10 20
+```
+
+#### \
+구조분해 확장 예시
+
+**1) 첫 줄만 N, M이고 나머지는 전부 데이터 줄 (여러 줄 입력)**
+
+```javascript
+const fs = require("fs");
+const [first, ...rest] = fs
+  .readFileSync("example.txt")
+  .toString()
+  .trim()
+  .split("\n")
+  .map(v => v.split(" ").map(Number));
+
+const [N, M] = first;
+const data = rest; // 나머지 모든 줄 (2차원 배열)
+```
+
+**2) 첫 줄 N, M + 나머지는 한 줄씩 쌍 (a, b)**
+
+```javascript
+const fs = require("fs");
+const [first, ...pairs] = fs
+  .readFileSync("example.txt")
+  .toString()
+  .trim()
+  .split("\n")
+  .map(v => v.split(" ").map(Number));
+
+const [N, M] = first;
+for (const [a, b] of pairs) {
+  // a, b 사용
+}
+```
