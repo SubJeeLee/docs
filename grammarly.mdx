@@ -1,0 +1,33 @@
+---
+title: "자바스크립트 문법 정리"
+---
+
+> 코딩테스트를 준비하면서 풀었던 문제들에서 얻은 자바스크립트 문법을 간략하게 정리해둔 메모장으로 사용될 페이지입니다!
+
+## 백준 입력
+
+### 기본 템플릿
+
+```javascript
+const fs = require("fs");
+const input = fs.readFileSync(0, "utf8").trim();
+```
+
+설명: 0은 표준입력(stdin) 파일 디스크립터다. Windows/맥/리눅스 모두 동작해서 가장 안전
+
+```javascript
+const fs = require("fs");
+const lines = fs.readFileSync(0, "utf8").trim().split("\n");
+const [N, M] = lines[0].split(" ").map(Number);
+```
+
+이 코드는 **첫 줄에 N M이 있고, 이후 줄에 추가 데이터가 있는 입력**에 맞다. 예시는 아래처럼:
+
+`5 4 `\
+`1 2 `\
+`3 4 `\
+`1 4 `\
+`2 2 `
+
+- 첫 줄 "5 4" → N=5, M=4
+- 나머지 줄들은 lines[1]부터 별도로 처리하면 됨

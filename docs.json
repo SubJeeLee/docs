@@ -19,13 +19,26 @@
           {
             "group": "Review",
             "pages": [
-              "Review/week10/day1", "Review/week10/day2", "Review/week10/day3", "Review/week10/day4", "Review/week10/cs_quiz"
+              "Review/week10/day1",
+              "Review/week10/day2",
+              "Review/week10/day3",
+              "Review/week10/day4",
+              "Review/week10/cs_quiz"
             ]
           },
           {
             "group": "Group-Project",
             "pages": [
-              "Group-Project/web30/backlog", "Group-Project/web30/Optimistic_Update", "Group-Project/web30/architecture", "Group-Project/web30/terminal"
+              "Group-Project/web30/backlog",
+              "Group-Project/web30/Optimistic_Update",
+              "Group-Project/web30/architecture",
+              "Group-Project/web30/terminal"
+            ]
+          },
+          {
+            "group": "Javascript",
+            "pages": [
+              "grammarly"
             ]
           }
         ]

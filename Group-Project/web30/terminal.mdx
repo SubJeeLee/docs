@@ -264,7 +264,6 @@ function pwd(): string {
    /system/ls
    /system/cd
    ```
-
 4. **작업 경로(Path) 관리 및 세션 문제**
 
 - 현재는 모든 사용자가 동일한 currentDir(전역 상태)을 공유하고 있음.
@@ -273,3 +272,9 @@ function pwd(): string {
   사용자 세션별로 독립적인 디렉토리 상태를 관리해야 함.
   - 방법 ①: 세션 ID 기반 Map 구조로 관리 (Map\<sessionId, currentDir\>)
   - 방법 ②: JWT 토큰 기반 사용자별 context 유지
+
+```typescript
+ ls(): string[] {
+    return this.currentDir.children.map(c => c.name);
+  }
+```
