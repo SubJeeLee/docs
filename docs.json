@@ -40,6 +40,12 @@
             "pages": [
               "grammarly"
             ]
+          },
+          {
+            "group": "React",
+            "pages": [
+              "tanstack-query"
+            ]
           }
         ]
       }

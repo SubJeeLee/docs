@@ -1,0 +1,178 @@
+---
+title: "Tanstack Query"
+---
+
+프론트엔드 개발자로서 서비스의 완성도를 결정짓는 가장 큰 요소 중 하나는 **'사용자가 막힘없이 매끄럽게 화면을 이용할 수 있는가'**입니다. 이를 가능하게 만드는 핵심 기술이 바로 **비동기(Asynchronous)** 처리입니다.
+
+우리가 배우려는 `TanStack Query`는 결국 이 비동기 처리를 얼마나 효율적으로 관리하느냐에 대한 해답입니다. 따라서 본격적인 라이브러리 사용법에 앞서, 웹 서비스에서 비동기가 왜 필수적인지 그 근본적인 이유부터 짚고 넘어가봅시다:)\
+
+## 비동기(Asynchronous) 요청, 왜 필요할까?\
+
+### 비동기란 무엇인가?
+
+쉽게 말해 **'기다려주지 않는 실행'**입니다. 카페에서 커피를 주문할 때, 앞사람의 커피가 나올 때까지 다음 사람이 주문을 못 하는 게 아니라, 진동벨을 받고 다른 일을 하다가 커피가 나오면 받는 것과 같습니다.
+
+### 왜 프론트에서 서버로 비동기 요청을 하나요?
+
+사용자 경험(UX) 때문입니다. 서버에서 데이터를 가져오는 데 2초가 걸린다고 가정했을 때, 비동기가 아니라면 그 2초 동안 브라우저는 멈춰버립니다. 비동기 요청을 통해 화면은 계속 보여주면서(Non-blocking) 백그라운드에서 데이터를 가져와야 매끄러운 서비스 이용이 가능합니다.
+
+---
+
+## 기존 방식 vs TanStack Query\
+
+### 그렇다면 우리는 그동안 비동기를 어떻게 다뤄왔을까요?
+
+비동기가 필요하다는 건 알겠는데, 막상 코드로 구현하려고 하면 생각보다 챙길 게 많습니다... 기존의 방식인 `useState`와 `useEffect` 조합을 먼저 살펴보겠습니다.\
+
+### 기존의 비동기 코드 (useState \+ useEffect)
+
+```tsx
+const [data, setData] = useState(null);
+const [isLoading, setIsLoading] = useState(true);
+
+useEffect(() => {
+  fetch('https://api.example.com/data')
+    .then((res) => res.json())
+    .then((json) => {
+      setData(json);
+      setIsLoading(false);
+    });
+}, []);
+```
+
+**이 방식의 문제점:**
+
+1. **반복되는 보일러플레이트:** 모든 컴포넌트마다 로딩, 에러, 데이터 상태를 따로 만들어야 합니다.
+2. **캐싱의 부재:** 컴포넌트가 다시 렌더링될 때마다 똑같은 API를 또 호출합니다.
+3. **데이터 동기화:** 서버 데이터가 바뀌었을 때 화면을 최신화하기 어렵습니다.
+
+**TanStack Query를 사용하면?** \
+단 몇 줄로 로딩, 에러 상태 관리와 캐싱까지 자동으로 처리됩니다. 비즈니스 로직에만 집중할 수 있게 되죠. 자세한 코드는 아래 핵심 개념 부분에서 더 자세히 살펴봅시다~
+
+---
+
+## 클라이언트 상태 vs 서버 상태
+
+> 우리는 상태(State)를 두 가지로 나누어 생각해야 합니다.
+
+- **클라이언트 상태 (Client State):** UI의 모달 오픈 여부, 다크모드 설정 등 브라우저 내에서만 관리되는 휘발성 데이터입니다.
+- **서버 상태 (Server State):** DB에 저장된 사용자 정보, 게시글 등 원격에 위치하며 여러 사용자가 동시에 변경할 수 있는 데이터입니다.
+
+### 서버 상태의 문제점
+
+서버 상태는 클라이언트가 직접 소유하지 않기 때문에 **"잠재적으로 오래된(Stale) 데이터"**가 될 수 있다는 점이 가장 큰 문제입니다. 누군가 내가 보는 게시물을 수정했다면, 내 화면의 데이터는 이미 틀린 데이터가 됩니다.\
+
+### 이 난해한 '서버 상태', 누가 관리해야 할까?
+
+우리가 클라이언트 상태와 서버 상태를 굳이 나누어 생각하게 된 이유는, 결국 **서버 상태를 관리하는 난이도가 훨씬 높기 때문**입니다. 서버 데이터는 내 브라우저 밖에 존재하며, 언제든 다른 사용자에 의해 변할 수 있습니다.
+
+기존에는 Redux나 Context API 같은 클라이언트 상태 관리 도구에 이 서버 데이터를 억지로 집어넣어 관리하곤 했습니다. 하지만 TanStack Query 공식 문서에서는 이를 두고 **"비동기 상태 관리의 어려움을 해결해 주는 서버 상태 관리자(Server State Manager)"**라고 정의합니다.
+
+즉, "데이터를 어떻게 가져올 것인가"보다 **"가져온 데이터를 어떻게 최신으로 유지하고 캐싱할 것인가"**라는 본질적인 고민에 집중하는 도구인 셈이죠.
+
+---
+
+## 핵심 개념: Query와 Mutation\
+
+### 자, 이제 도구를 어떻게 사용하는지 볼까요?
+
+데이터의 성격을 구분했다면, 이제 실제 액션을 취할 차례입니다. 공식 문서에서는 크게 두 가지 핵심 기능을 제시합니다.
+
+### Query (데이터 조회: 읽기 전용)
+
+> 서버에서 **데이터를 가져올 때(GET)** 사용합니다.
+
+- **역할:** 단순히 데이터를 가져오는 데 그치지 않고, 가져온 데이터를 **캐싱(Caching)**합니다.
+- **핵심 기능:** 동일한 데이터를 여러 번 요청해도 서버에 매번 물어보지 않고 캐시된 데이터를 즉시 보여줍니다. 만약 데이터가 너무 오래되었다고 판단(Stale)되면, 백그라운드에서 조용히 최신 데이터를 다시 가져와 화면을 업데이트합니다.
+
+### 데이터 조회: `useQuery` (신선도 유지의 핵심)
+
+> 기존에 `useEffect`로 수십 줄을 써야 했던 로직이 단 한 줄의 훅으로 정리됩니다.
+
+```tsx
+import { useQuery } from '@tanstack/react-query';
+
+const fetchUserList = () => fetch('/api/users').then(res => res.json());
+
+function UserList() {
+  // 'users'라는 키를 가진 쿼리 생성
+  const { data, isLoading, isError } = useQuery({
+    queryKey: ['users'], 
+    queryFn: fetchUserList,
+    staleTime: 1000 * 60 * 5, // 5분 동안은 '신선함(Fresh)'으로 간주해!
+  });
+
+  if (isLoading) return <div>로딩 중...</div>;
+  if (isError) return <div>에러가 발생했습니다.</div>;
+
+  return (
+    <ul>
+      {data.map(user => <li key={user.id}>{user.name}</li>)}
+    </ul>
+  );
+}
+```
+
+- **성능 포인트 (Request Deduping):** 만약 같은 화면에 `UserList` 컴포넌트가 3개 떠 있어도, TanStack Query는 `['users']` 키가 같음을 인지하고 **API 요청을 딱 한 번만** 보냅니다.
+- **경험 포인트 (Caching):** 다른 페이지에 갔다가 돌아왔을 때, `staleTime` 이내라면 로딩 바 없이 즉시 데이터를 보여줍니다.\
+
+### Mutation (데이터 변경: 쓰기 전용)
+
+> 서버의 데이터를 **생성, 수정, 삭제(POST, PUT, DELETE)**할 때 사용합니다.
+
+- **역할:** 데이터에 변화를 주는 작업을 수행합니다.
+- **핵심 기능:** 여기서 Query와의 강력한 연결고리가 생깁니다. 데이터를 성공적으로 변경했다면, 기존에 캐싱되어 있던 데이터는 이제 '틀린 데이터'가 되겠죠? 이때 **Query Invalidation(쿼리 무효화)** 기능을 사용해 관련 Query를 즉시 'Stale' 상태로 만들어 버립니다. 그럼 TanStack Query는 알아서 최신 데이터를 다시 페칭해 화면을 동기화합니다.
+
+### 데이터 변경과 동기화: `useMutation`
+
+> 데이터를 바꾼 뒤, 화면을 수동으로 새로고침할 필요가 없습니다.
+
+```tsx
+import { useMutation, useQueryClient } from '@tanstack/react-query';
+
+function AddUser() {
+  const queryClient = useQueryClient();
+
+  const mutation = useMutation({
+    mutationFn: (newUser) => fetch('/api/users', {
+      method: 'POST',
+      body: JSON.stringify(newUser),
+    }),
+    // 성공하면 실행되는 콜백
+    onSuccess: () => {
+      // 가장 중요한 부분: 'users' 키를 가진 쿼리를 무효화(Invalidate) 시킴!
+      queryClient.invalidateQueries({ queryKey: ['users'] });
+    },
+  });
+
+  return (
+    <button onClick={() => mutation.mutate({ name: '준섭' })}>
+      유저 추가하기
+    </button>
+  );
+}
+```
+
+- **Invalidation:** 유저를 추가하는 순간, TanStack Query는 `['users']` 데이터가 이제 '상했다(Stale)'고 판단합니다. 그리고 즉시 백그라운드에서 최신 목록을 다시 가져와(Refetch) 화면을 업데이트하죠. 개발자는 **"성공하면 다시 불러와!"**라고 선언만 하면 끝입니다.
+
+---
+
+### 결론: 왜 성능적으로 압도적인가?
+
+> 단순히 코드가 짧아지는 것을 넘어, 내부적으로는 다음과 같은 정교한 작업들이 일어납니다.
+
+1. **Background Refetching:** 사용자가 윈도우 탭을 전환했다가 돌아오면(`refetchOnWindowFocus`), TanStack Query는 서버에 "그사이 바뀐 거 있어?"라고 물어보고 데이터를 조용히 최신화합니다.
+2. **Garbage Collection:** 더 이상 사용하지 않는 데이터는 메모리에서 알아서 지워주어(default 5분) 브라우저 성능을 최적화합니다.
+3. **Retry:** 네트워크가 불안정해서 요청이 실패하면, 정해진 횟수만큼 똑똑하게 다시 시도합니다.
+
+### 학습 마무리
+
+비동기 통신을 직접 구현할 때는 "에러 나면 어떡하지?", "로딩은 언제 끝내지?" 같은 걱정이 앞섰습니다. 하지만 TanStack Query를 사용하면서부터는 **"이 키에 해당하는 데이터는 이 라이브러리가 책임지고 최신 상태로 유지해 줄 거야"**라는 믿음이 있어,
+
+이제 우리는 어떻게 데이터를 가져올지가 아니라, **어떻게 데이터를 보여줄지(UI/UX)**에만 온전히 집중할 수 있습니다. 그래서 이제는 TanStack Query가 현대 프론트엔드 개발의 필수 학습 개념인 것 같습니다:)
+
+---
+
+### References
+
+_참고: [TanStack Query 공식 문서](https://tanstack.com/query/latest/docs/framework/react/overview)_
