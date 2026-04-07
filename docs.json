@@ -46,6 +46,17 @@
             "pages": [
               "tanstack-query"
             ]
+          },
+          {
+            "group": "CS Study",
+            "pages": [
+              {
+                "group": "Computer Network",
+                "pages": [
+                  "untitled-page"
+                ]
+              }
+            ]
           }
         ]
       }
