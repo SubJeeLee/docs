@@ -55,6 +55,12 @@
                 "pages": [
                   "untitled-page"
                 ]
+              },
+              {
+                "group": "SE&Testing",
+                "pages": [
+                  "file"
+                ]
               }
             ]
           }
